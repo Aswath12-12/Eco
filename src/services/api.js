@@ -234,6 +234,27 @@ export async function deleteStudent(id) {
   return true;
 }
 
+export async function bulkUpdateStudentHouse(studentIds, newHouseId) {
+  if (!studentIds || studentIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('students')
+    .update({ house_id: newHouseId || null })
+    .in('id', studentIds)
+    .select('*, house:houses(*)');
+  if (error) throw error;
+  return data;
+}
+
+export async function bulkDeleteStudents(studentIds) {
+  if (!studentIds || studentIds.length === 0) return true;
+  const { error } = await supabase
+    .from('students')
+    .delete()
+    .in('id', studentIds);
+  if (error) throw error;
+  return true;
+}
+
 // ====================================================================
 // BULK IMPORT STUDENTS
 // ====================================================================
