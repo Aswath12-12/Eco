@@ -4,20 +4,18 @@ import {
   Crown,
   Medal,
   Award,
-  Users,
-  Percent,
   Sparkles,
-  TrendingUp,
   RefreshCw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { getHouseRankings } from '../../services/api';
+import { getHouseRankings, getWeeklyWinners } from '../../services/api';
 import HouseBadge, { HOUSE_COLORS } from '../../components/HouseBadge';
 import { CardSkeleton } from '../../components/LoadingSkeleton';
 import { useToast } from '../../context/ToastContext';
 
 export default function RankingsPage() {
   const [rankings, setRankings] = useState([]);
+  const [weeklyWinners, setWeeklyWinners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { error: toastError } = useToast();
@@ -25,8 +23,12 @@ export default function RankingsPage() {
   const loadRankings = async (triggerConfetti = false) => {
     try {
       setRefreshing(true);
-      const data = await getHouseRankings();
+      const [data, winnersData] = await Promise.all([
+        getHouseRankings(),
+        getWeeklyWinners(),
+      ]);
       setRankings(data);
+      setWeeklyWinners(winnersData);
       if (triggerConfetti && data.length > 0) {
         confetti({
           particleCount: 80,
@@ -48,11 +50,6 @@ export default function RankingsPage() {
     loadRankings(true);
   }, []);
 
-  const firstPlace = rankings[0];
-  const secondPlace = rankings[1];
-  const thirdPlace = rankings[2];
-  const fourthPlace = rankings[3];
-
   return (
     <div className="space-y-8 pb-12">
       {/* Top Header */}
@@ -66,7 +63,7 @@ export default function RankingsPage() {
             Inter-House Rankings & Leaderboard
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Calculated dynamically from live student counts, weekly marks, and turnouts
+            Calculated dynamically from points scored by each House team across all activities
           </p>
         </div>
 
@@ -86,170 +83,167 @@ export default function RankingsPage() {
         <CardSkeleton count={4} />
       ) : (
         <>
-          {/* PODIUM ROW */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-            {/* 2nd Place */}
-            {secondPlace && (
-              <div className="order-2 md:order-1 bg-white rounded-3xl p-6 border-2 border-slate-300 shadow-sm relative flex flex-col justify-between transform hover:-translate-y-1 transition duration-200">
-                <div className="text-center pb-4 border-b border-slate-100">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-700 font-black text-xl flex items-center justify-center mx-auto mb-3 border border-slate-300 shadow-xs">
-                    🥈
-                  </div>
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                    2nd Place
-                  </span>
-                  <h3 className="text-lg font-black text-slate-900 mt-1">{secondPlace.name}</h3>
-                  <div className="mt-2">
-                    <HouseBadge code={secondPlace.code} size="md" />
-                  </div>
-                </div>
+          {/* PODIUM ROW - DYNAMIC TO CELEBRATE TIED 1ST PLACE / JOINT WINNERS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+            {rankings.map((h) => {
+              const isFirst = h.rank === 1;
+              const isSecond = h.rank === 2;
+              const isThird = h.rank === 3;
 
-                <div className="space-y-2.5 pt-4 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Total Points</span>
-                    <span className="font-extrabold text-slate-900 text-sm">{secondPlace.totalMarks} pts</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Members Present</span>
-                    <span className="font-bold text-slate-800">
-                      {secondPlace.membersPresent ?? secondPlace.activeStudents} / {secondPlace.totalStudents}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Turnout Rate</span>
-                    <span className="font-bold text-eco-700">{secondPlace.participationRate}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Average Score</span>
-                    <span className="font-bold text-slate-700">{secondPlace.averageMarks} pts</span>
-                  </div>
-                </div>
-              </div>
-            )}
+              return (
+                <div
+                  key={h.id}
+                  className={`rounded-3xl p-6 border-2 transition duration-200 shadow-sm relative flex flex-col justify-between ${
+                    isFirst
+                      ? 'border-amber-400 bg-gradient-to-b from-amber-500/10 via-white to-white ring-4 ring-amber-400/20 shadow-xl transform hover:-translate-y-2'
+                      : isSecond
+                      ? 'border-slate-300 bg-white hover:-translate-y-1'
+                      : isThird
+                      ? 'border-amber-700/30 bg-white hover:-translate-y-1'
+                      : 'border-slate-200 bg-white hover:-translate-y-1'
+                  }`}
+                >
+                  {isFirst && (
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2">
+                      <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30">
+                        <Crown className="w-6 h-6 animate-bounce" />
+                      </div>
+                    </div>
+                  )}
 
-            {/* 1st Place - Champion */}
-            {firstPlace && (
-              <div className="order-1 md:order-2 bg-gradient-to-b from-amber-500/10 via-white to-white rounded-3xl p-7 border-2 border-amber-400 shadow-xl relative flex flex-col justify-between transform hover:-translate-y-2 transition duration-200 ring-4 ring-amber-400/20 md:-mb-2">
-                <div className="absolute -top-5 left-1/2 -translate-x-1/2">
-                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30">
-                    <Crown className="w-6 h-6 animate-bounce" />
-                  </div>
-                </div>
+                  <div>
+                    <div
+                      className={`text-center pb-4 border-b ${
+                        isFirst ? 'pt-2 border-amber-100' : 'border-slate-100'
+                      }`}
+                    >
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 shadow-xs text-xl">
+                        {isFirst ? (
+                          <span className="text-2xl">🥇</span>
+                        ) : isSecond ? (
+                          <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-300 text-slate-700 font-black flex items-center justify-center text-base">
+                            🥈
+                          </div>
+                        ) : isThird ? (
+                          <div className="w-10 h-10 rounded-full bg-amber-800/10 border border-amber-700/30 text-amber-900 font-black flex items-center justify-center text-base">
+                            🥉
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 text-slate-500 font-black flex items-center justify-center text-xs">
+                            #4
+                          </div>
+                        )}
+                      </div>
 
-                <div className="text-center pt-3 pb-4 border-b border-amber-100">
-                  <span className="text-xs font-black uppercase tracking-widest text-amber-800">
-                    Current Leader
-                  </span>
-                  <h3 className="text-xl font-black text-slate-900 mt-1">{firstPlace.name}</h3>
-                  <div className="mt-2">
-                    <HouseBadge code={firstPlace.code} size="lg" />
-                  </div>
-                </div>
+                      <span
+                        className={`text-xs font-black uppercase tracking-wider ${
+                          isFirst ? 'text-amber-800' : 'text-slate-400'
+                        }`}
+                      >
+                        {isFirst
+                          ? h.isJointWinner
+                            ? 'Joint Winner (Tie) 🤝'
+                            : '1st Place Champion 🏆'
+                          : `${h.rank}${h.rank === 2 ? 'nd' : h.rank === 3 ? 'rd' : 'th'} Place`}
+                      </span>
+                      <h3 className="text-lg font-black text-slate-900 mt-1">{h.name}</h3>
+                      <div className="mt-2">
+                        <HouseBadge code={h.code} size={isFirst ? 'lg' : 'md'} />
+                      </div>
+                    </div>
 
-                <div className="text-center py-4 bg-amber-50/60 rounded-2xl my-3">
-                  <div className="text-3xl font-black text-amber-900">{firstPlace.totalMarks}</div>
-                  <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
-                    Total House Points
+                    <div
+                      className={`text-center py-3.5 rounded-2xl my-3 ${
+                        isFirst
+                          ? 'bg-amber-50/70 text-amber-950 font-black'
+                          : 'bg-slate-50 text-slate-900'
+                      }`}
+                    >
+                      <div className="text-3xl font-black">{h.totalMarks}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Total Team Points
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Members Present</span>
-                    <span className="font-black text-slate-900">
-                      {firstPlace.membersPresent ?? firstPlace.activeStudents} / {firstPlace.totalStudents}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Turnout Rate</span>
-                    <span className="font-black text-eco-700">{firstPlace.participationRate}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Average Score</span>
-                    <span className="font-black text-slate-800">{firstPlace.averageMarks} pts</span>
+                  <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Average Score</span>
+                      <span className="font-bold text-slate-800">{h.averageMarks} pts</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Activities Evaluated</span>
+                      <span className="font-bold text-eco-700">{h.activitiesCount || 0}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* 3rd Place */}
-            {thirdPlace && (
-              <div className="order-3 md:order-3 bg-white rounded-3xl p-6 border-2 border-amber-700/30 shadow-sm relative flex flex-col justify-between transform hover:-translate-y-1 transition duration-200">
-                <div className="text-center pb-4 border-b border-slate-100">
-                  <div className="w-12 h-12 rounded-full bg-amber-800/10 text-amber-900 font-black text-xl flex items-center justify-center mx-auto mb-3 border border-amber-700/30 shadow-xs">
-                    🥉
-                  </div>
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-amber-800">
-                    3rd Place
-                  </span>
-                  <h3 className="text-lg font-black text-slate-900 mt-1">{thirdPlace.name}</h3>
-                  <div className="mt-2">
-                    <HouseBadge code={thirdPlace.code} size="md" />
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 pt-4 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Total Points</span>
-                    <span className="font-extrabold text-slate-900 text-sm">{thirdPlace.totalMarks} pts</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Members Present</span>
-                    <span className="font-bold text-slate-800">
-                      {thirdPlace.membersPresent ?? thirdPlace.activeStudents} / {thirdPlace.totalStudents}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Turnout Rate</span>
-                    <span className="font-bold text-eco-700">{thirdPlace.participationRate}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Average Score</span>
-                    <span className="font-bold text-slate-700">{thirdPlace.averageMarks} pts</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 4th Place */}
-            {fourthPlace && (
-              <div className="order-4 md:order-4 bg-white rounded-3xl p-6 border border-slate-200 shadow-xs relative flex flex-col justify-between transform hover:-translate-y-1 transition duration-200">
-                <div className="text-center pb-4 border-b border-slate-100">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-600 font-black text-base flex items-center justify-center mx-auto mb-3 border border-slate-200">
-                    #4
-                  </div>
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    4th Place
-                  </span>
-                  <h3 className="text-lg font-black text-slate-900 mt-1">{fourthPlace.name}</h3>
-                  <div className="mt-2">
-                    <HouseBadge code={fourthPlace.code} size="md" />
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 pt-4 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Total Points</span>
-                    <span className="font-extrabold text-slate-900 text-sm">{fourthPlace.totalMarks} pts</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Members Present</span>
-                    <span className="font-bold text-slate-800">
-                      {fourthPlace.membersPresent ?? fourthPlace.activeStudents} / {fourthPlace.totalStudents}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Turnout Rate</span>
-                    <span className="font-bold text-eco-700">{fourthPlace.participationRate}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Average Score</span>
-                    <span className="font-bold text-slate-700">{fourthPlace.averageMarks} pts</span>
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
+
+          {/* WEEKLY ROUND WINNERS & TIE ANNOUNCEMENT CAROUSEL / GRID */}
+          {weeklyWinners.length > 0 && (
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                    <Trophy className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Weekly Round Champions & Tie Announcements
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Teams with equal highest scores in any round are officially announced as Joint Winners
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {weeklyWinners.map((w) => (
+                  <div
+                    key={w.weekNumber}
+                    className={`p-4 rounded-2xl border transition ${
+                      w.isTie
+                        ? 'border-amber-400 bg-gradient-to-b from-amber-50/70 to-white shadow-2xs'
+                        : 'border-slate-200 bg-white shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-black text-slate-700 border border-slate-200">
+                        Week {w.weekNumber}
+                      </span>
+                      {w.isTie ? (
+                        <span className="text-[10px] font-extrabold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span>Joint Winners (Tie) 🤝</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-extrabold text-eco-800 bg-eco-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span>Round Winner 🏆</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="font-black text-slate-900 text-sm mt-1">
+                      {w.winners.map((win) => win.house?.name).join(' & ')}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mt-2">
+                      {w.winners.map((win) => (
+                        <HouseBadge key={win.house_id} code={win.house?.code} size="xs" />
+                      ))}
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-100 flex justify-between items-center">
+                      <span>Evaluation Score</span>
+                      <span className="font-black text-eco-700">{w.maxMarks} pts</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* DETAILED COMPARISON TABLE */}
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
@@ -258,7 +252,7 @@ export default function RankingsPage() {
                 Complete Inter-House Performance Matrix
               </h2>
               <p className="text-xs text-slate-500">
-                Transparent ranking breakdown factoring in points, members present, and turnout percentage
+                Transparent ranking breakdown based strictly on cumulative points scored by each House
               </p>
             </div>
 
@@ -269,37 +263,26 @@ export default function RankingsPage() {
                     <th className="py-3 px-4">Rank</th>
                     <th className="py-3 px-4">House Name</th>
                     <th className="py-3 px-4">Code</th>
-                    <th className="py-3 px-4 text-center">Total Enrolled</th>
-                    <th className="py-3 px-4 text-center">Members Present</th>
-                    <th className="py-3 px-4 text-center">Turnout Rate</th>
+                    <th className="py-3 px-4 text-center">Activities Completed</th>
                     <th className="py-3 px-4 text-right">Average / Activity</th>
-                    <th className="py-3 px-4 text-right font-black">Total Marks</th>
+                    <th className="py-3 px-4 text-right font-black">Total Championship Points</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {rankings.map((h) => (
                     <tr key={h.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-4 px-4 font-black text-slate-900">
-                        {h.rank === 1 && '🥇 1st'}
-                        {h.rank === 2 && '🥈 2nd'}
-                        {h.rank === 3 && '🥉 3rd'}
+                        {h.rank === 1 && (h.isJointWinner ? '🥇 Joint 1st (Tie)' : '🥇 1st')}
+                        {h.rank === 2 && (h.isTie ? '🥈 2nd (Tie)' : '🥈 2nd')}
+                        {h.rank === 3 && (h.isTie ? '🥉 3rd (Tie)' : '🥉 3rd')}
                         {h.rank === 4 && '4th'}
                       </td>
                       <td className="py-4 px-4 font-bold text-slate-900">{h.name}</td>
                       <td className="py-4 px-4">
                         <HouseBadge code={h.code} size="sm" />
                       </td>
-                      <td className="py-4 px-4 text-center text-slate-700 font-semibold">{h.totalStudents}</td>
-                      <td className="py-4 px-4 text-center">
-                        <span className="font-bold text-slate-900">
-                          {h.membersPresent ?? h.activeStudents}
-                        </span>
-                        <span className="text-slate-400 text-xs"> / {h.totalStudents}</span>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-eco-50 text-eco-800 border border-eco-200/50">
-                          {h.participationRate}%
-                        </span>
+                      <td className="py-4 px-4 text-center text-slate-700 font-semibold">
+                        {h.activitiesCount || 0} activities
                       </td>
                       <td className="py-4 px-4 text-right font-semibold text-slate-800">
                         {h.averageMarks} pts

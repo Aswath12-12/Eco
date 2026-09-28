@@ -294,15 +294,13 @@ export default function StudentDashboard() {
                 <span className="text-slate-400">House Total Score</span>
                 <span className="font-black text-eco-700">{data?.myHouseRank?.totalMarks || 0} pts</span>
               </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">Members Present</span>
-                <span className="font-bold text-slate-800">
-                  {data?.myHouseRank?.membersPresent ?? data?.myHouseRank?.activeStudents ?? 0} / {data?.myHouseRank?.totalStudents ?? 0}
-                </span>
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-400">Average / Activity</span>
+                <span className="font-bold text-slate-800">{data?.myHouseRank?.averageMarks || 0} pts</span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">Turnout Rate</span>
-                <span className="font-bold text-eco-700">{data?.myHouseRank?.participationRate || 0}%</span>
+                <span className="text-slate-400">Activities Evaluated</span>
+                <span className="font-bold text-eco-700">{data?.myHouseRank?.activitiesCount || 0}</span>
               </div>
             </div>
           </div>
@@ -335,7 +333,7 @@ export default function StudentDashboard() {
                   <div>
                     <div className="font-bold text-slate-900 text-sm">{h.name}</div>
                     <div className="text-xs text-slate-400">
-                      {h.membersPresent ?? h.activeStudents} present / {h.totalStudents} enrolled • {h.participationRate}% turnout
+                      {h.activitiesCount || 0} activities evaluated
                     </div>
                   </div>
                 </div>
@@ -343,7 +341,7 @@ export default function StudentDashboard() {
                 <div className="flex items-center gap-6">
                   <div className="text-right">
                     <span className="text-xs font-black text-slate-900">{h.totalMarks} pts</span>
-                    <div className="text-[10px] text-eco-700 font-bold">{h.participationRate}% turnout</div>
+                    <div className="text-[10px] text-slate-400">{h.averageMarks} avg pts</div>
                   </div>
                   <HouseBadge code={h.code} size="sm" />
                 </div>

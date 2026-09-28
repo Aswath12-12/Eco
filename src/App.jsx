@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Layouts
 import PublicLayout from './layouts/PublicLayout';
@@ -37,53 +38,55 @@ export default function App() {
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <Routes>
-            {/* Public Routes */}
-            <Route element={<PublicLayout />}>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/leaderboard" element={<LeaderboardPage />} />
-            </Route>
+          <ErrorBoundary>
+            <Routes>
+              {/* Public Routes */}
+              <Route element={<PublicLayout />}>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+              </Route>
 
-            {/* Admin Protected Routes */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRole="ADMIN">
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<AdminDashboard />} />
-              <Route path="students" element={<StudentsPage />} />
-              <Route path="students/import" element={<BulkImportPage />} />
-              <Route path="houses" element={<HousesPage />} />
-              <Route path="activities" element={<ActivitiesPage />} />
-              <Route path="marks" element={<MarksPage />} />
-              <Route path="rankings" element={<RankingsPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="profile" element={<AdminProfilePage />} />
-            </Route>
+              {/* Admin Protected Routes */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRole="ADMIN">
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<AdminDashboard />} />
+                <Route path="students" element={<StudentsPage />} />
+                <Route path="students/import" element={<BulkImportPage />} />
+                <Route path="houses" element={<HousesPage />} />
+                <Route path="activities" element={<ActivitiesPage />} />
+                <Route path="marks" element={<MarksPage />} />
+                <Route path="rankings" element={<RankingsPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="profile" element={<AdminProfilePage />} />
+              </Route>
 
-            {/* Student Protected Routes */}
-            <Route
-              path="/student"
-              element={
-                <ProtectedRoute allowedRole="STUDENT">
-                  <StudentLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<StudentDashboard />} />
-              <Route path="profile" element={<StudentProfilePage />} />
-              <Route path="reset-password" element={<StudentResetPasswordPage />} />
-              <Route path="marks" element={<StudentMarksPage />} />
-              <Route path="activities" element={<StudentActivitiesPage />} />
-            </Route>
+              {/* Student Protected Routes */}
+              <Route
+                path="/student"
+                element={
+                  <ProtectedRoute allowedRole="STUDENT">
+                    <StudentLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<StudentDashboard />} />
+                <Route path="profile" element={<StudentProfilePage />} />
+                <Route path="reset-password" element={<StudentResetPasswordPage />} />
+                <Route path="marks" element={<StudentMarksPage />} />
+                <Route path="activities" element={<StudentActivitiesPage />} />
+              </Route>
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

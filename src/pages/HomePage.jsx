@@ -173,25 +173,18 @@ export default function HomePage() {
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-200/60 grid grid-cols-3 gap-1 text-center bg-white/70 rounded-xl p-2.5">
+                  <div className="pt-4 border-t border-slate-200/60 grid grid-cols-2 gap-2 text-center bg-white/70 rounded-xl p-3">
                     <div>
-                      <div className="text-base font-extrabold text-slate-900">
+                      <div className="text-xl font-extrabold text-slate-900">
                         {house.totalMarks || 0}
                       </div>
-                      <div className="text-[9px] uppercase font-bold text-slate-400">Total Pts</div>
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Total Points</div>
                     </div>
                     <div>
-                      <div className="text-base font-extrabold text-slate-900">
-                        {house.membersPresent ?? house.activeStudents ?? 0}
-                        <span className="text-[10px] font-normal text-slate-400">/{house.totalStudents}</span>
+                      <div className="text-xl font-extrabold text-eco-700">
+                        {house.averageMarks || 0}
                       </div>
-                      <div className="text-[9px] uppercase font-bold text-slate-400">Present</div>
-                    </div>
-                    <div>
-                      <div className="text-base font-extrabold text-eco-700">
-                        {house.participationRate || 0}%
-                      </div>
-                      <div className="text-[9px] uppercase font-bold text-slate-400">Turnout</div>
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Avg / Activity</div>
                     </div>
                   </div>
                 </div>

@@ -304,7 +304,7 @@ export default function AdminDashboard() {
                     <div>
                       <div className="font-bold text-slate-900 text-sm">{house.name}</div>
                       <div className="text-xs text-slate-400">
-                        {house.membersPresent ?? house.activeStudents} present / {house.totalStudents} enrolled • {house.participationRate}% turnout
+                        {house.activitiesCount || 0} activities evaluated
                       </div>
                     </div>
                   </div>
@@ -312,17 +312,15 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-6 text-right">
                     <div>
                       <div className="text-xs text-slate-400 font-semibold uppercase">Total Points</div>
-                      <div className="text-base font-black text-slate-900">{house.totalMarks}</div>
+                      <div className="text-base font-black text-slate-900">{house.totalMarks} pts</div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 font-semibold uppercase">Members Present</div>
-                      <div className="text-base font-bold text-slate-800">
-                        {house.membersPresent ?? house.activeStudents} <span className="text-xs text-slate-400 font-normal">/ {house.totalStudents}</span>
-                      </div>
+                      <div className="text-xs text-slate-400 font-semibold uppercase">Avg / Activity</div>
+                      <div className="text-base font-bold text-slate-800">{house.averageMarks} pts</div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 font-semibold uppercase">Turnout</div>
-                      <div className="text-base font-bold text-eco-700">{house.participationRate}%</div>
+                      <div className="text-xs text-slate-400 font-semibold uppercase">Standing</div>
+                      <div className="text-base font-bold text-eco-700">#{house.rank}</div>
                     </div>
                   </div>
                 </div>

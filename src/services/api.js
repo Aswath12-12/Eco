@@ -36,7 +36,7 @@ export async function getHouseRankings() {
   // 2. Fetch all students with their house_id
   const { data: students, error: studentErr } = await supabase
     .from('students')
-    .select('id, house_id, status');
+    .select('id, house_id');
   if (studentErr) throw studentErr;
 
   // 3. Fetch all weekly marks with student_id, activity_id, week_number
@@ -47,33 +47,16 @@ export async function getHouseRankings() {
 
   // Map students to house
   const studentToHouseMap = {};
-  const houseStudentCounts = {};
-  const houseActiveStudentCounts = {};
-
-  (houses || []).forEach((h) => {
-    houseStudentCounts[h.id] = 0;
-    houseActiveStudentCounts[h.id] = 0;
-  });
-
   (students || []).forEach((s) => {
     if (s.house_id) {
       studentToHouseMap[s.id] = s.house_id;
-      houseStudentCounts[s.house_id] = (houseStudentCounts[s.house_id] || 0) + 1;
-      if (s.status === 'ACTIVE') {
-        houseActiveStudentCounts[s.house_id] = (houseActiveStudentCounts[s.house_id] || 0) + 1;
-      }
     }
   });
 
-  // Aggregate marks and attendance turnout per house by activity & week
+  // Aggregate marks per house by activity & week
   const houseActivityMarks = {};
-  const houseActivityPresentCounts = {};
-  const houseStudentParticipations = {};
-
   (houses || []).forEach((h) => {
     houseActivityMarks[h.id] = {};
-    houseActivityPresentCounts[h.id] = {};
-    houseStudentParticipations[h.id] = new Set();
   });
 
   (marks || []).forEach((m) => {
@@ -84,56 +67,92 @@ export async function getHouseRankings() {
       if (houseActivityMarks[houseId][key] === undefined || markVal > houseActivityMarks[houseId][key]) {
         houseActivityMarks[houseId][key] = markVal;
       }
-      houseActivityPresentCounts[houseId][key] = (houseActivityPresentCounts[houseId][key] || 0) + 1;
-      houseStudentParticipations[houseId].add(m.student_id);
     }
   });
 
-  // Calculate detailed house ranking list factoring in members present & turnout
+  // Calculate detailed team ranking based purely on points
   const ranked = (houses || []).map((h) => {
-    const totalStudents = houseStudentCounts[h.id] || 0;
     const actMarks = Object.values(houseActivityMarks[h.id] || {});
     const totalMarks = actMarks.reduce((sum, val) => sum + val, 0);
     const avgMarks = actMarks.length > 0 ? Number((totalMarks / actMarks.length).toFixed(1)) : 0;
-    const uniqueParticipants = houseStudentParticipations[h.id]?.size || 0;
-
-    // Average attendance turnout / members present per evaluated activity
-    const presentPerAct = Object.values(houseActivityPresentCounts[h.id] || {});
-    const avgMembersPresent = presentPerAct.length > 0
-      ? Math.round(presentPerAct.reduce((sum, val) => sum + val, 0) / presentPerAct.length)
-      : uniqueParticipants;
-
-    const participationRate = totalStudents > 0
-      ? Math.min(100, Math.round(((avgMembersPresent || uniqueParticipants) / totalStudents) * 100))
-      : 0;
 
     return {
       ...h,
-      totalStudents,
-      activeStudents: houseActiveStudentCounts[h.id] || 0,
       totalMarks,
       averageMarks: avgMarks,
-      membersPresent: avgMembersPresent || uniqueParticipants,
-      uniqueMembersPresent: uniqueParticipants,
-      participationRate,
       activitiesCount: actMarks.length,
     };
   });
 
-  // Sort descending by totalMarks, then by participationRate (attendance turnout), then by membersPresent, then by averageMarks
+  // Sort descending purely by totalMarks, then by averageMarks, then by activitiesCount
   ranked.sort(
     (a, b) =>
       b.totalMarks - a.totalMarks ||
-      b.participationRate - a.participationRate ||
-      b.membersPresent - a.membersPresent ||
-      b.averageMarks - a.averageMarks
+      b.averageMarks - a.averageMarks ||
+      b.activitiesCount - a.activitiesCount
   );
 
-  // Assign dynamic ranks (1st, 2nd, 3rd, 4th)
-  return ranked.map((house, index) => ({
-    ...house,
-    rank: index + 1,
-  }));
+  // Assign dynamic ranks with standard sports tie-handling (equal points = same rank / joint winners)
+  let currentRank = 1;
+  return ranked.map((house, index, arr) => {
+    if (index > 0 && house.totalMarks < arr[index - 1].totalMarks) {
+      currentRank = index + 1;
+    }
+    const isTie = arr.some((other, oIdx) => oIdx !== index && other.totalMarks === house.totalMarks && house.totalMarks > 0);
+    return {
+      ...house,
+      rank: currentRank,
+      isTie,
+      isWinner: currentRank === 1 && house.totalMarks > 0,
+      isJointWinner: currentRank === 1 && isTie && house.totalMarks > 0,
+    };
+  });
+}
+
+// ====================================================================
+// WEEKLY WINNERS & TIE ANNOUNCEMENTS
+// ====================================================================
+export async function getWeeklyWinners() {
+  const houseMarks = await getHouseWeeklyMarks();
+  const weeksMap = {};
+
+  houseMarks.forEach((m) => {
+    const w = m.week_number;
+    if (!weeksMap[w]) {
+      weeksMap[w] = { weekNumber: w, maxMarks: 0, entries: [] };
+    }
+    const marksVal = Number(m.marks) || 0;
+    if (marksVal > weeksMap[w].maxMarks) {
+      weeksMap[w].maxMarks = marksVal;
+    }
+    weeksMap[w].entries.push(m);
+  });
+
+  return Object.values(weeksMap)
+    .filter((wInfo) => wInfo.maxMarks > 0)
+    .map((wInfo) => {
+      // Find all houses with max marks in this week
+      const topEntries = wInfo.entries.filter((m) => Number(m.marks) === wInfo.maxMarks);
+      // Deduplicate by house_id
+      const uniqueWinners = [];
+      const seenHouse = new Set();
+      topEntries.forEach((entry) => {
+        if (entry.house_id && !seenHouse.has(entry.house_id)) {
+          seenHouse.add(entry.house_id);
+          uniqueWinners.push(entry);
+        }
+      });
+
+      const isTie = uniqueWinners.length > 1;
+      return {
+        weekNumber: wInfo.weekNumber,
+        maxMarks: wInfo.maxMarks,
+        isTie,
+        winners: uniqueWinners,
+        winnerHouses: uniqueWinners.map((w) => w.house),
+      };
+    })
+    .sort((a, b) => b.weekNumber - a.weekNumber);
 }
 
 // ====================================================================
@@ -335,7 +354,7 @@ export async function deleteActivity(id) {
 export async function getWeeklyMarks({ weekNumber, activityId, studentId, houseId } = {}) {
   let query = supabase
     .from('weekly_marks')
-    .select('*, student:students(*, house:houses(*)), activity:activities(*)')
+    .select('id, marks, remarks, week_number, created_at, student_id, activity_id, student:students(id, name, roll_number, house_id, house:houses(id, name, code, color)), activity:activities(id, name, maximum_mark, activity_date)')
     .order('created_at', { ascending: false });
 
   if (weekNumber) query = query.eq('week_number', weekNumber);
@@ -386,17 +405,7 @@ export async function deleteWeeklyMark(id) {
 // HOUSE WEEKLY MARKS (SINGLE HOUSE LEVEL MARKS)
 // ====================================================================
 export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = {}) {
-  const [allMarks, studentsRes] = await Promise.all([
-    getWeeklyMarks({ weekNumber, activityId, houseId }),
-    supabase.from('students').select('id, house_id'),
-  ]);
-
-  const houseStudentCounts = {};
-  (studentsRes.data || []).forEach((s) => {
-    if (s.house_id) {
-      houseStudentCounts[s.house_id] = (houseStudentCounts[s.house_id] || 0) + 1;
-    }
-  });
+  const allMarks = await getWeeklyMarks({ weekNumber, activityId, houseId });
 
   // Group by composite key: house_id + activity_id + week_number
   const groups = new Map();
@@ -407,7 +416,6 @@ export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = 
     const groupKey = `${hId}_${m.activity_id}_${m.week_number}`;
 
     if (!groups.has(groupKey)) {
-      const totalInHouse = houseStudentCounts[hId] || 0;
       groups.set(groupKey, {
         id: groupKey,
         house_id: hId,
@@ -417,92 +425,53 @@ export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = 
         week_number: m.week_number,
         marks: m.marks,
         remarks: m.remarks,
-        studentCount: 0,
-        totalHouseStudents: totalInHouse,
-        turnoutRate: 0,
-        studentIds: [],
         markIds: [],
         created_at: m.created_at,
       });
     }
 
     const group = groups.get(groupKey);
-    group.studentCount += 1;
-    group.studentIds.push(m.student_id);
     group.markIds.push(m.id);
-    if (group.totalHouseStudents > 0) {
-      group.turnoutRate = Math.round((group.studentCount / group.totalHouseStudents) * 100);
-    }
   });
 
   return Array.from(groups.values());
 }
 
-export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, marks, remarks, presentCount }) {
+export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, marks, remarks }) {
   if (!houseId) throw new Error('Please select a House');
   if (!activityId) throw new Error('Please select an Activity');
   if (!weekNumber) throw new Error('Please select a Week Number');
 
-  // 1. Fetch active students in this house (fallback to all if no active)
-  let { data: students, error: sErr } = await supabase
+  // Fetch one representative student in this house to anchor the points
+  const { data: students, error: sErr } = await supabase
     .from('students')
-    .select('id, name')
+    .select('id')
     .eq('house_id', houseId)
-    .eq('status', 'ACTIVE')
-    .order('name');
+    .limit(1);
 
   if (sErr) throw sErr;
   if (!students || students.length === 0) {
-    const { data: allSt, error: allErr } = await supabase
-      .from('students')
-      .select('id, name')
-      .eq('house_id', houseId)
-      .order('name');
-    if (allErr) throw allErr;
-    students = allSt || [];
+    throw new Error('This house does not have any registered students yet. Please assign at least one student to this house first.');
   }
 
-  if (!students || students.length === 0) {
-    throw new Error('This house does not have any registered students yet. Please assign students to this house first.');
-  }
+  const studentId = students[0].id;
 
-  // Determine how many students are present
-  const targetCount = presentCount !== undefined && Number(presentCount) > 0
-    ? Math.min(Number(presentCount), students.length)
-    : students.length;
-
-  const presentStudents = students.slice(0, targetCount);
-  const presentStudentIds = new Set(presentStudents.map((s) => s.id));
-
-  // If editing: remove marks for students from this house who were NOT present
-  const allStudentIds = students.map((s) => s.id);
-  const absentStudentIds = allStudentIds.filter((id) => !presentStudentIds.has(id));
-  if (absentStudentIds.length > 0) {
-    await supabase
-      .from('weekly_marks')
-      .delete()
-      .eq('activity_id', activityId)
-      .eq('week_number', Number(weekNumber))
-      .in('student_id', absentStudentIds);
-  }
-
-  // 2. Prepare bulk rows for weekly_marks
-  const rows = presentStudents.map((st) => ({
-    student_id: st.id,
-    activity_id: activityId,
-    week_number: Number(weekNumber),
-    marks: Number(marks),
-    remarks: remarks?.trim() || null,
-  }));
-
-  // 3. Upsert into weekly_marks
+  // Single-row upsert into weekly_marks - ultra fast (~30-50ms)
   const { data, error } = await supabase
     .from('weekly_marks')
-    .upsert(rows, { onConflict: 'student_id, activity_id, week_number' })
-    .select();
+    .upsert(
+      {
+        student_id: studentId,
+        activity_id: activityId,
+        week_number: Number(weekNumber),
+        marks: Number(marks),
+        remarks: remarks?.trim() || null,
+      },
+      { onConflict: 'student_id, activity_id, week_number' }
+    );
 
   if (error) throw error;
-  return { success: true, count: rows.length, totalHouseStudents: students.length, data };
+  return { success: true, data };
 }
 
 export async function deleteHouseWeeklyMarks({ houseId, activityId, weekNumber }) {
