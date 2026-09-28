@@ -295,8 +295,14 @@ export default function StudentDashboard() {
                 <span className="font-black text-eco-700">{data?.myHouseRank?.totalMarks || 0} pts</span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">House Participation</span>
-                <span className="font-bold text-slate-800">{data?.myHouseRank?.participationRate || 0}%</span>
+                <span className="text-slate-400">Members Present</span>
+                <span className="font-bold text-slate-800">
+                  {data?.myHouseRank?.membersPresent ?? data?.myHouseRank?.activeStudents ?? 0} / {data?.myHouseRank?.totalStudents ?? 0}
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-slate-400">Turnout Rate</span>
+                <span className="font-bold text-eco-700">{data?.myHouseRank?.participationRate || 0}%</span>
               </div>
             </div>
           </div>
@@ -328,14 +334,16 @@ export default function StudentDashboard() {
                   </span>
                   <div>
                     <div className="font-bold text-slate-900 text-sm">{h.name}</div>
-                    <div className="text-xs text-slate-400">{h.totalStudents} Members</div>
+                    <div className="text-xs text-slate-400">
+                      {h.membersPresent ?? h.activeStudents} present / {h.totalStudents} enrolled • {h.participationRate}% turnout
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-6">
                   <div className="text-right">
                     <span className="text-xs font-black text-slate-900">{h.totalMarks} pts</span>
-                    <div className="text-[10px] text-slate-400">{h.participationRate}% participation</div>
+                    <div className="text-[10px] text-eco-700 font-bold">{h.participationRate}% turnout</div>
                   </div>
                   <HouseBadge code={h.code} size="sm" />
                 </div>

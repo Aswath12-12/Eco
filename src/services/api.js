@@ -39,10 +39,10 @@ export async function getHouseRankings() {
     .select('id, house_id, status');
   if (studentErr) throw studentErr;
 
-  // 3. Fetch all weekly marks with student_id
+  // 3. Fetch all weekly marks with student_id, activity_id, week_number
   const { data: marks, error: marksErr } = await supabase
     .from('weekly_marks')
-    .select('id, marks, student_id');
+    .select('id, marks, student_id, activity_id, week_number');
   if (marksErr) throw marksErr;
 
   // Map students to house
@@ -65,12 +65,14 @@ export async function getHouseRankings() {
     }
   });
 
-  // Aggregate marks per house by activity & week
+  // Aggregate marks and attendance turnout per house by activity & week
   const houseActivityMarks = {};
+  const houseActivityPresentCounts = {};
   const houseStudentParticipations = {};
 
   (houses || []).forEach((h) => {
     houseActivityMarks[h.id] = {};
+    houseActivityPresentCounts[h.id] = {};
     houseStudentParticipations[h.id] = new Set();
   });
 
@@ -82,18 +84,28 @@ export async function getHouseRankings() {
       if (houseActivityMarks[houseId][key] === undefined || markVal > houseActivityMarks[houseId][key]) {
         houseActivityMarks[houseId][key] = markVal;
       }
+      houseActivityPresentCounts[houseId][key] = (houseActivityPresentCounts[houseId][key] || 0) + 1;
       houseStudentParticipations[houseId].add(m.student_id);
     }
   });
 
-  // Calculate detailed house ranking list
+  // Calculate detailed house ranking list factoring in members present & turnout
   const ranked = (houses || []).map((h) => {
     const totalStudents = houseStudentCounts[h.id] || 0;
     const actMarks = Object.values(houseActivityMarks[h.id] || {});
     const totalMarks = actMarks.reduce((sum, val) => sum + val, 0);
     const avgMarks = actMarks.length > 0 ? Number((totalMarks / actMarks.length).toFixed(1)) : 0;
     const uniqueParticipants = houseStudentParticipations[h.id]?.size || 0;
-    const participationRate = totalStudents > 0 ? Math.round((uniqueParticipants / totalStudents) * 100) : 0;
+
+    // Average attendance turnout / members present per evaluated activity
+    const presentPerAct = Object.values(houseActivityPresentCounts[h.id] || {});
+    const avgMembersPresent = presentPerAct.length > 0
+      ? Math.round(presentPerAct.reduce((sum, val) => sum + val, 0) / presentPerAct.length)
+      : uniqueParticipants;
+
+    const participationRate = totalStudents > 0
+      ? Math.min(100, Math.round(((avgMembersPresent || uniqueParticipants) / totalStudents) * 100))
+      : 0;
 
     return {
       ...h,
@@ -101,13 +113,21 @@ export async function getHouseRankings() {
       activeStudents: houseActiveStudentCounts[h.id] || 0,
       totalMarks,
       averageMarks: avgMarks,
+      membersPresent: avgMembersPresent || uniqueParticipants,
+      uniqueMembersPresent: uniqueParticipants,
       participationRate,
       activitiesCount: actMarks.length,
     };
   });
 
-  // Sort descending by totalMarks, then by averageMarks
-  ranked.sort((a, b) => b.totalMarks - a.totalMarks || b.averageMarks - a.averageMarks);
+  // Sort descending by totalMarks, then by participationRate (attendance turnout), then by membersPresent, then by averageMarks
+  ranked.sort(
+    (a, b) =>
+      b.totalMarks - a.totalMarks ||
+      b.participationRate - a.participationRate ||
+      b.membersPresent - a.membersPresent ||
+      b.averageMarks - a.averageMarks
+  );
 
   // Assign dynamic ranks (1st, 2nd, 3rd, 4th)
   return ranked.map((house, index) => ({
@@ -366,7 +386,17 @@ export async function deleteWeeklyMark(id) {
 // HOUSE WEEKLY MARKS (SINGLE HOUSE LEVEL MARKS)
 // ====================================================================
 export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = {}) {
-  const allMarks = await getWeeklyMarks({ weekNumber, activityId, houseId });
+  const [allMarks, studentsRes] = await Promise.all([
+    getWeeklyMarks({ weekNumber, activityId, houseId }),
+    supabase.from('students').select('id, house_id'),
+  ]);
+
+  const houseStudentCounts = {};
+  (studentsRes.data || []).forEach((s) => {
+    if (s.house_id) {
+      houseStudentCounts[s.house_id] = (houseStudentCounts[s.house_id] || 0) + 1;
+    }
+  });
 
   // Group by composite key: house_id + activity_id + week_number
   const groups = new Map();
@@ -377,6 +407,7 @@ export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = 
     const groupKey = `${hId}_${m.activity_id}_${m.week_number}`;
 
     if (!groups.has(groupKey)) {
+      const totalInHouse = houseStudentCounts[hId] || 0;
       groups.set(groupKey, {
         id: groupKey,
         house_id: hId,
@@ -387,6 +418,8 @@ export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = 
         marks: m.marks,
         remarks: m.remarks,
         studentCount: 0,
+        totalHouseStudents: totalInHouse,
+        turnoutRate: 0,
         studentIds: [],
         markIds: [],
         created_at: m.created_at,
@@ -397,12 +430,15 @@ export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = 
     group.studentCount += 1;
     group.studentIds.push(m.student_id);
     group.markIds.push(m.id);
+    if (group.totalHouseStudents > 0) {
+      group.turnoutRate = Math.round((group.studentCount / group.totalHouseStudents) * 100);
+    }
   });
 
   return Array.from(groups.values());
 }
 
-export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, marks, remarks }) {
+export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, marks, remarks, presentCount }) {
   if (!houseId) throw new Error('Please select a House');
   if (!activityId) throw new Error('Please select an Activity');
   if (!weekNumber) throw new Error('Please select a Week Number');
@@ -412,14 +448,16 @@ export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, 
     .from('students')
     .select('id, name')
     .eq('house_id', houseId)
-    .eq('status', 'ACTIVE');
+    .eq('status', 'ACTIVE')
+    .order('name');
 
   if (sErr) throw sErr;
   if (!students || students.length === 0) {
     const { data: allSt, error: allErr } = await supabase
       .from('students')
       .select('id, name')
-      .eq('house_id', houseId);
+      .eq('house_id', houseId)
+      .order('name');
     if (allErr) throw allErr;
     students = allSt || [];
   }
@@ -428,8 +466,28 @@ export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, 
     throw new Error('This house does not have any registered students yet. Please assign students to this house first.');
   }
 
+  // Determine how many students are present
+  const targetCount = presentCount !== undefined && Number(presentCount) > 0
+    ? Math.min(Number(presentCount), students.length)
+    : students.length;
+
+  const presentStudents = students.slice(0, targetCount);
+  const presentStudentIds = new Set(presentStudents.map((s) => s.id));
+
+  // If editing: remove marks for students from this house who were NOT present
+  const allStudentIds = students.map((s) => s.id);
+  const absentStudentIds = allStudentIds.filter((id) => !presentStudentIds.has(id));
+  if (absentStudentIds.length > 0) {
+    await supabase
+      .from('weekly_marks')
+      .delete()
+      .eq('activity_id', activityId)
+      .eq('week_number', Number(weekNumber))
+      .in('student_id', absentStudentIds);
+  }
+
   // 2. Prepare bulk rows for weekly_marks
-  const rows = students.map((st) => ({
+  const rows = presentStudents.map((st) => ({
     student_id: st.id,
     activity_id: activityId,
     week_number: Number(weekNumber),
@@ -444,7 +502,7 @@ export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, 
     .select();
 
   if (error) throw error;
-  return { success: true, count: rows.length, data };
+  return { success: true, count: rows.length, totalHouseStudents: students.length, data };
 }
 
 export async function deleteHouseWeeklyMarks({ houseId, activityId, weekNumber }) {

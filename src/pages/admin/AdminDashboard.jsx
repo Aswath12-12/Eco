@@ -304,7 +304,7 @@ export default function AdminDashboard() {
                     <div>
                       <div className="font-bold text-slate-900 text-sm">{house.name}</div>
                       <div className="text-xs text-slate-400">
-                        {house.totalStudents} enrolled • {house.activeStudents} active
+                        {house.membersPresent ?? house.activeStudents} present / {house.totalStudents} enrolled • {house.participationRate}% turnout
                       </div>
                     </div>
                   </div>
@@ -315,8 +315,10 @@ export default function AdminDashboard() {
                       <div className="text-base font-black text-slate-900">{house.totalMarks}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 font-semibold uppercase">Avg / Student</div>
-                      <div className="text-base font-bold text-slate-800">{house.averageMarks}</div>
+                      <div className="text-xs text-slate-400 font-semibold uppercase">Members Present</div>
+                      <div className="text-base font-bold text-slate-800">
+                        {house.membersPresent ?? house.activeStudents} <span className="text-xs text-slate-400 font-normal">/ {house.totalStudents}</span>
+                      </div>
                     </div>
                     <div>
                       <div className="text-xs text-slate-400 font-semibold uppercase">Turnout</div>

@@ -51,6 +51,7 @@ export default function MarksPage() {
   const [formActivityId, setFormActivityId] = useState('');
   const [formHouseId, setFormHouseId] = useState('');
   const [formMarks, setFormMarks] = useState(8);
+  const [formPresentCount, setFormPresentCount] = useState(0);
   const [formRemarks, setFormRemarks] = useState('');
   const [formError, setFormError] = useState('');
 
@@ -119,6 +120,7 @@ export default function MarksPage() {
     setFormActivityId(defAct);
     setFormHouseId(defHouse);
     setFormMarks(8);
+    setFormPresentCount(studentsCountByHouse[defHouse] || 0);
     setFormRemarks('');
     setFormError('');
     setIsModalOpen(true);
@@ -130,6 +132,7 @@ export default function MarksPage() {
     setFormActivityId(mark.activity_id);
     setFormHouseId(mark.house_id);
     setFormMarks(mark.marks);
+    setFormPresentCount(mark.studentCount || studentsCountByHouse[mark.house_id] || 0);
     setFormRemarks(mark.remarks || '');
     setFormError('');
     setIsModalOpen(true);
@@ -163,6 +166,17 @@ export default function MarksPage() {
       return;
     }
 
+    const totalStudentsInHouse = studentsCountByHouse[formHouseId] || 0;
+    const presentNum = Number(formPresentCount);
+    if (isNaN(presentNum) || presentNum < 1) {
+      setFormError('Members present must be at least 1 student.');
+      return;
+    }
+    if (totalStudentsInHouse > 0 && presentNum > totalStudentsInHouse) {
+      setFormError(`Members present cannot exceed total enrolled students in this house (${totalStudentsInHouse}).`);
+      return;
+    }
+
     try {
       setSubmitting(true);
       const res = await upsertHouseWeeklyMarks({
@@ -171,11 +185,13 @@ export default function MarksPage() {
         weekNumber: Number(formWeek),
         marks: marksNum,
         remarks: formRemarks.trim() || null,
+        presentCount: presentNum,
       });
 
       const targetHouse = houses.find((h) => h.id === formHouseId);
       const houseName = targetHouse?.name?.split(' ')[0] || targetHouse?.code || 'House';
-      success(`Successfully awarded ${marksNum} marks to ${houseName} House (${res.count} members credited)!`);
+      const turnoutPct = Math.round((presentNum / (totalStudentsInHouse || 1)) * 100);
+      success(`Successfully awarded ${marksNum} marks to ${houseName} House (${res.count} members present • ${turnoutPct}% turnout)!`);
       setIsModalOpen(false);
       loadData();
     } catch (err) {
@@ -348,7 +364,7 @@ export default function MarksPage() {
                   <th className="py-3 px-4">House Evaluated</th>
                   <th className="py-3 px-4">Activity</th>
                   <th className="py-3 px-4 text-center">Marks Awarded</th>
-                  <th className="py-3 px-4 text-center">Members Credited</th>
+                  <th className="py-3 px-4 text-center">Members Present & Turnout</th>
                   <th className="py-3 px-4">Remarks</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -357,6 +373,8 @@ export default function MarksPage() {
                 {filteredMarks.map((m) => {
                   const maxMark = m.activity?.maximum_mark || 10;
                   const pct = Math.round((m.marks / maxMark) * 100);
+                  const totalMembersInHouse = m.totalHouseStudents || studentsCountByHouse[m.house_id] || m.studentCount;
+                  const turnoutRate = m.turnoutRate || Math.round((m.studentCount / (totalMembersInHouse || 1)) * 100);
 
                   return (
                     <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
@@ -394,10 +412,12 @@ export default function MarksPage() {
                         <div className="text-[10px] text-slate-400 font-semibold">{pct}%</div>
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                          <Users className="w-3 h-3" />
-                          <span>{m.studentCount} students</span>
-                        </span>
+                        <div className="font-bold text-xs text-slate-800">
+                          {m.studentCount} <span className="font-normal text-slate-400">/ {totalMembersInHouse} present</span>
+                        </div>
+                        <div className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                          <span>{turnoutRate}% turnout</span>
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-xs text-slate-500 max-w-xs truncate">
                         {m.remarks || '—'}
@@ -443,7 +463,7 @@ export default function MarksPage() {
                     {editingMark ? 'Edit House Weekly Marks' : 'Award House Weekly Marks'}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Marks will be credited to the House and all its registered members
+                    Marks will be credited to present members and added to the house standing
                   </p>
                 </div>
               </div>
@@ -477,7 +497,12 @@ export default function MarksPage() {
                         type="button"
                         key={h.id}
                         disabled={Boolean(editingMark)}
-                        onClick={() => setFormHouseId(h.id)}
+                        onClick={() => {
+                          setFormHouseId(h.id);
+                          if (!editingMark) {
+                            setFormPresentCount(count);
+                          }
+                        }}
                         className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 cursor-pointer disabled:cursor-not-allowed ${
                           isSelected
                             ? 'border-eco-600 bg-eco-50/70 ring-2 ring-eco-500/20'
@@ -559,6 +584,68 @@ export default function MarksPage() {
                 />
               </div>
 
+              {/* Members Present in Activity */}
+              {(() => {
+                const totalInSelectedHouse = studentsCountByHouse[formHouseId] || 0;
+                const presentNum = Number(formPresentCount) || 0;
+                const turnoutPct = totalInSelectedHouse > 0 ? Math.round((presentNum / totalInSelectedHouse) * 100) : 0;
+
+                return (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block font-bold text-slate-700 uppercase tracking-wider">
+                        Members Present in Activity *
+                      </label>
+                      <span className="text-[11px] font-bold text-eco-700">
+                        Total Enrolled: {totalInSelectedHouse} Students
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min="1"
+                        max={totalInSelectedHouse || 1}
+                        required
+                        value={formPresentCount}
+                        onChange={(e) => setFormPresentCount(Number(e.target.value))}
+                        className="w-28 p-2.5 rounded-xl border border-slate-200 text-base font-black text-slate-900 focus:outline-hidden focus:border-eco-600"
+                      />
+                      <div className="flex-1 text-xs text-slate-600">
+                        <span className="font-extrabold text-slate-900">
+                          {turnoutPct}% Turnout Rate
+                        </span>
+                        <div className="text-[10px] text-slate-400">
+                          {formPresentCount} of {totalInSelectedHouse} members present
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setFormPresentCount(totalInSelectedHouse)}
+                          className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                        >
+                          All (100%)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormPresentCount(Math.round(totalInSelectedHouse * 0.75))}
+                          className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                        >
+                          75%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormPresentCount(Math.round(totalInSelectedHouse * 0.5))}
+                          className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                        >
+                          50%
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Remarks */}
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -577,7 +664,7 @@ export default function MarksPage() {
               <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/70 text-amber-900 text-xs flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <p className="leading-relaxed text-[11px]">
-                  <strong>House-Level Award:</strong> Submitting this mark applies it to the selected House. All registered students in this house will automatically see this score in their portal under "My Marks" and it counts towards the house standings.
+                  <strong>House & Turnout Award:</strong> Submitting this mark applies it to the selected House and credits all <strong>{formPresentCount}</strong> present students. The attendance turnout will factor directly into inter-house standings and leaderboards.
                 </p>
               </div>
 

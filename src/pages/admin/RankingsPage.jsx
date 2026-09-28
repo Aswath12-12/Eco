@@ -110,16 +110,18 @@ export default function RankingsPage() {
                     <span className="font-extrabold text-slate-900 text-sm">{secondPlace.totalMarks} pts</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Total Students</span>
-                    <span className="font-bold text-slate-700">{secondPlace.totalStudents}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Average Score</span>
-                    <span className="font-bold text-slate-700">{secondPlace.averageMarks}</span>
+                    <span className="text-slate-400">Members Present</span>
+                    <span className="font-bold text-slate-800">
+                      {secondPlace.membersPresent ?? secondPlace.activeStudents} / {secondPlace.totalStudents}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Turnout Rate</span>
                     <span className="font-bold text-eco-700">{secondPlace.participationRate}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Average Score</span>
+                    <span className="font-bold text-slate-700">{secondPlace.averageMarks} pts</span>
                   </div>
                 </div>
               </div>
@@ -153,16 +155,18 @@ export default function RankingsPage() {
 
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Total Students</span>
-                    <span className="font-black text-slate-800">{firstPlace.totalStudents}</span>
+                    <span className="text-slate-500">Members Present</span>
+                    <span className="font-black text-slate-900">
+                      {firstPlace.membersPresent ?? firstPlace.activeStudents} / {firstPlace.totalStudents}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Turnout Rate</span>
+                    <span className="font-black text-eco-700">{firstPlace.participationRate}%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Average Score</span>
-                    <span className="font-black text-slate-800">{firstPlace.averageMarks}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Participation</span>
-                    <span className="font-black text-eco-700">{firstPlace.participationRate}%</span>
+                    <span className="font-black text-slate-800">{firstPlace.averageMarks} pts</span>
                   </div>
                 </div>
               </div>
@@ -190,16 +194,18 @@ export default function RankingsPage() {
                     <span className="font-extrabold text-slate-900 text-sm">{thirdPlace.totalMarks} pts</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Total Students</span>
-                    <span className="font-bold text-slate-700">{thirdPlace.totalStudents}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Average Score</span>
-                    <span className="font-bold text-slate-700">{thirdPlace.averageMarks}</span>
+                    <span className="text-slate-400">Members Present</span>
+                    <span className="font-bold text-slate-800">
+                      {thirdPlace.membersPresent ?? thirdPlace.activeStudents} / {thirdPlace.totalStudents}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Turnout Rate</span>
                     <span className="font-bold text-eco-700">{thirdPlace.participationRate}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Average Score</span>
+                    <span className="font-bold text-slate-700">{thirdPlace.averageMarks} pts</span>
                   </div>
                 </div>
               </div>
@@ -227,16 +233,18 @@ export default function RankingsPage() {
                     <span className="font-extrabold text-slate-900 text-sm">{fourthPlace.totalMarks} pts</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Total Students</span>
-                    <span className="font-bold text-slate-700">{fourthPlace.totalStudents}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Average Score</span>
-                    <span className="font-bold text-slate-700">{fourthPlace.averageMarks}</span>
+                    <span className="text-slate-400">Members Present</span>
+                    <span className="font-bold text-slate-800">
+                      {fourthPlace.membersPresent ?? fourthPlace.activeStudents} / {fourthPlace.totalStudents}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Turnout Rate</span>
                     <span className="font-bold text-eco-700">{fourthPlace.participationRate}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Average Score</span>
+                    <span className="font-bold text-slate-700">{fourthPlace.averageMarks} pts</span>
                   </div>
                 </div>
               </div>
@@ -250,7 +258,7 @@ export default function RankingsPage() {
                 Complete Inter-House Performance Matrix
               </h2>
               <p className="text-xs text-slate-500">
-                Transparent ranking breakdown powered strictly by database tallies
+                Transparent ranking breakdown factoring in points, members present, and turnout percentage
               </p>
             </div>
 
@@ -261,10 +269,10 @@ export default function RankingsPage() {
                     <th className="py-3 px-4">Rank</th>
                     <th className="py-3 px-4">House Name</th>
                     <th className="py-3 px-4">Code</th>
-                    <th className="py-3 px-4 text-center">Total Students</th>
-                    <th className="py-3 px-4 text-center">Active Members</th>
-                    <th className="py-3 px-4 text-center">Participation %</th>
-                    <th className="py-3 px-4 text-right">Average / Student</th>
+                    <th className="py-3 px-4 text-center">Total Enrolled</th>
+                    <th className="py-3 px-4 text-center">Members Present</th>
+                    <th className="py-3 px-4 text-center">Turnout Rate</th>
+                    <th className="py-3 px-4 text-right">Average / Activity</th>
                     <th className="py-3 px-4 text-right font-black">Total Marks</th>
                   </tr>
                 </thead>
@@ -281,10 +289,15 @@ export default function RankingsPage() {
                       <td className="py-4 px-4">
                         <HouseBadge code={h.code} size="sm" />
                       </td>
-                      <td className="py-4 px-4 text-center">{h.totalStudents}</td>
-                      <td className="py-4 px-4 text-center text-emerald-700 font-bold">{h.activeStudents}</td>
+                      <td className="py-4 px-4 text-center text-slate-700 font-semibold">{h.totalStudents}</td>
                       <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-eco-50 text-eco-800">
+                        <span className="font-bold text-slate-900">
+                          {h.membersPresent ?? h.activeStudents}
+                        </span>
+                        <span className="text-slate-400 text-xs"> / {h.totalStudents}</span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-eco-50 text-eco-800 border border-eco-200/50">
                           {h.participationRate}%
                         </span>
                       </td>

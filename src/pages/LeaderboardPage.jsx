@@ -6,44 +6,40 @@ import {
   Search,
   Filter,
   Shield,
-  RotateCcw,
   Sparkles,
-  ChevronDown,
-  User,
+  Users,
+  Calendar,
+  Percent,
 } from 'lucide-react';
-import { getHouses, getLeaderboardData, getHouseRankings } from '../services/api';
-import HouseBadge from '../components/HouseBadge';
+import { getHouses, getHouseRankings, getHouseWeeklyMarks } from '../services/api';
+import HouseBadge, { HOUSE_COLORS } from '../components/HouseBadge';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 
 export default function LeaderboardPage() {
   const [houses, setHouses] = useState([]);
   const [houseRankings, setHouseRankings] = useState([]);
-  const [leaderboard, setLeaderboard] = useState([]);
+  const [activityMarks, setActivityMarks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filters & Search
   const [search, setSearch] = useState('');
   const [selectedHouse, setSelectedHouse] = useState('');
-  const [selectedDept, setSelectedDept] = useState('');
-  const [selectedYear, setSelectedYear] = useState('');
   const [selectedWeek, setSelectedWeek] = useState('');
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [hList, hRankings, lbData] = await Promise.all([
+      const [hList, hRankings, marksData] = await Promise.all([
         getHouses().catch(() => []),
         getHouseRankings().catch(() => []),
-        getLeaderboardData({
-          houseId: selectedHouse,
-          department: selectedDept,
-          year: selectedYear,
-          weekNumber: selectedWeek ? Number(selectedWeek) : null,
+        getHouseWeeklyMarks({
+          houseId: selectedHouse || undefined,
+          weekNumber: selectedWeek ? Number(selectedWeek) : undefined,
         }).catch(() => []),
       ]);
       setHouses(hList);
       setHouseRankings(hRankings);
-      setLeaderboard(lbData);
+      setActivityMarks(marksData);
     } catch (err) {
       console.error('Error loading leaderboard:', err);
     } finally {
@@ -53,25 +49,19 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     loadData();
-  }, [selectedHouse, selectedDept, selectedYear, selectedWeek]);
+  }, [selectedHouse, selectedWeek]);
 
   // Client-side search filtering
-  const filteredStudents = useMemo(() => {
-    if (!search.trim()) return leaderboard;
+  const filteredActivities = useMemo(() => {
+    if (!search.trim()) return activityMarks;
     const q = search.toLowerCase();
-    return leaderboard.filter(
-      (st) =>
-        st.name?.toLowerCase().includes(q) ||
-        st.roll_number?.toLowerCase().includes(q) ||
-        st.department?.toLowerCase().includes(q)
+    return activityMarks.filter(
+      (m) =>
+        m.activity?.name?.toLowerCase().includes(q) ||
+        m.house?.name?.toLowerCase().includes(q) ||
+        m.remarks?.toLowerCase().includes(q)
     );
-  }, [leaderboard, search]);
-
-  const topThree = leaderboard.slice(0, 3);
-
-  // Available departments & years for dropdowns
-  const departments = ['Computer Science', 'Mechanical', 'Civil', 'Electrical', 'Biotech', 'Electronics', 'Chemical', 'Information Tech'];
-  const years = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+  }, [activityMarks, search]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
@@ -82,10 +72,10 @@ export default function LeaderboardPage() {
           Eco Club Championship Standings
         </div>
         <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">
-          House & Student Leaderboard
+          Inter-House Championship Leaderboard
         </h1>
         <p className="mt-3 text-slate-600 text-sm sm:text-base">
-          Celebrating top-performing environmentalists and tracking inter-house green points in real-time.
+          Tracking official House points, member turnout rates, and activity performance evaluations.
         </p>
       </div>
 
@@ -106,6 +96,10 @@ export default function LeaderboardPage() {
             4: 'text-slate-300',
           }[h.rank];
 
+          const presentCount = h.membersPresent ?? h.activeStudents ?? 0;
+          const totalMembers = h.totalStudents || 0;
+          const turnoutPct = h.participationRate || 0;
+
           return (
             <div
               key={h.id}
@@ -123,14 +117,22 @@ export default function LeaderboardPage() {
                 {h.totalMarks}{' '}
                 <span className="text-xs font-semibold text-slate-500 uppercase">pts</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Students</span>
-                  <span className="font-bold text-slate-700">{h.totalStudents}</span>
+
+              <div className="space-y-2 pt-3 border-t border-slate-100 text-xs">
+                {/* Members Present & Turnout */}
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 text-[11px] font-bold uppercase">Members Present</span>
+                  <span className="font-extrabold text-slate-900">
+                    {presentCount} <span className="font-normal text-slate-400">/ {totalMembers}</span>
+                  </span>
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Avg Marks</span>
-                  <span className="font-bold text-slate-700">{h.averageMarks}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 text-[11px] font-bold uppercase">Turnout Rate</span>
+                  <span className="font-black text-eco-700">{turnoutPct}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 text-[11px] font-bold uppercase">Avg / Activity</span>
+                  <span className="font-bold text-slate-700">{h.averageMarks} pts</span>
                 </div>
               </div>
             </div>
@@ -138,16 +140,16 @@ export default function LeaderboardPage() {
         })}
       </div>
 
-      {/* STUDENT LEADERBOARD SECTION */}
+      {/* INTER-HOUSE ACTIVITY BREAKDOWN & TURNOUT TABLE */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100">
           <div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-              <Medal className="w-6 h-6 text-eco-600" />
-              Student Individual Rankings
+              <Shield className="w-6 h-6 text-eco-600" />
+              Inter-House Activity Evaluations & Turnout
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Top participating students based on weekly activities and performance marks
+              Weekly scores, attendance turnouts, and performance marks awarded to each House
             </p>
           </div>
 
@@ -158,14 +160,14 @@ export default function LeaderboardPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by student or roll no..."
+              placeholder="Search by activity or remarks..."
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-eco-500/20 focus:border-eco-600 bg-slate-50/50"
             />
           </div>
         </div>
 
         {/* Filter Controls */}
-        <div className="py-4 grid grid-cols-2 sm:grid-cols-4 gap-3 border-b border-slate-100 text-xs">
+        <div className="py-4 grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-slate-100 text-xs">
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
               Filter by House
@@ -179,42 +181,6 @@ export default function LeaderboardPage() {
               {houses.map((h) => (
                 <option key={h.id} value={h.id}>
                   {h.name} ({h.code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Department
-            </label>
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-hidden focus:border-eco-500"
-            >
-              <option value="">All Departments</option>
-              {departments.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Year of Study
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-hidden focus:border-eco-500"
-            >
-              <option value="">All Years</option>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
                 </option>
               ))}
             </select>
@@ -239,95 +205,80 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
-        {/* Leaderboard Table */}
+        {/* House Activity Table */}
         <div className="mt-6 overflow-x-auto">
           {loading ? (
             <TableSkeleton rows={6} cols={6} />
-          ) : filteredStudents.length === 0 ? (
+          ) : filteredActivities.length === 0 ? (
             <div className="text-center py-16 text-slate-500">
               <Trophy className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="font-bold text-slate-700">No student records found</p>
+              <p className="font-bold text-slate-700">No house activity evaluations logged yet</p>
               <p className="text-xs text-slate-400 mt-1">
-                Students and marks will appear here once administrators log activities and scores.
+                House marks and attendance turnout will appear here once administrators record weekly scores.
               </p>
             </div>
           ) : (
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-[11px] uppercase tracking-wider font-bold text-slate-500 border-b border-slate-200/80">
                 <tr>
-                  <th className="py-3.5 px-4 text-center w-16">Rank</th>
-                  <th className="py-3.5 px-4">Student</th>
-                  <th className="py-3.5 px-4">House</th>
-                  <th className="py-3.5 px-4">Department & Year</th>
-                  <th className="py-3.5 px-4 text-center">Activities</th>
-                  <th className="py-3.5 px-4 text-right">Total Marks</th>
-                  <th className="py-3.5 px-4 text-right">Average</th>
+                  <th className="py-3.5 px-4 w-24">Week</th>
+                  <th className="py-3.5 px-4">House Evaluated</th>
+                  <th className="py-3.5 px-4">Activity Name</th>
+                  <th className="py-3.5 px-4 text-center">Marks Awarded</th>
+                  <th className="py-3.5 px-4 text-center">Members Present & Turnout</th>
+                  <th className="py-3.5 px-4">Coordinator Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {filteredStudents.map((st) => {
-                  const isGold = st.rank === 1;
-                  const isSilver = st.rank === 2;
-                  const isBronze = st.rank === 3;
-
-                  let rankBadge = (
-                    <span className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold inline-flex items-center justify-center text-xs">
-                      #{st.rank}
-                    </span>
-                  );
-
-                  if (isGold) {
-                    rankBadge = (
-                      <span className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-black inline-flex items-center justify-center text-xs shadow-xs">
-                        🥇 1
-                      </span>
-                    );
-                  } else if (isSilver) {
-                    rankBadge = (
-                      <span className="w-8 h-8 rounded-full bg-slate-200 text-slate-800 border border-slate-300 font-black inline-flex items-center justify-center text-xs shadow-xs">
-                        🥈 2
-                      </span>
-                    );
-                  } else if (isBronze) {
-                    rankBadge = (
-                      <span className="w-8 h-8 rounded-full bg-amber-800/10 text-amber-900 border border-amber-700/30 font-black inline-flex items-center justify-center text-xs shadow-xs">
-                        🥉 3
-                      </span>
-                    );
-                  }
+                {filteredActivities.map((m) => {
+                  const maxMark = m.activity?.maximum_mark || 10;
+                  const pct = Math.round((m.marks / maxMark) * 100);
 
                   return (
-                    <tr
-                      key={st.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        isGold ? 'bg-amber-50/30 font-semibold' : ''
-                      }`}
-                    >
-                      <td className="py-4 px-4 text-center">{rankBadge}</td>
-                      <td className="py-4 px-4">
-                        <div className="font-bold text-slate-900 text-sm">{st.name}</div>
-                        <div className="text-xs font-mono text-slate-400">{st.roll_number}</div>
+                    <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-4 px-4 font-bold text-slate-800 text-xs">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700">
+                          Week {m.week_number}
+                        </span>
                       </td>
                       <td className="py-4 px-4">
-                        <HouseBadge code={st.house?.code} size="sm" />
+                        <div className="flex items-center gap-2.5">
+                          <HouseBadge code={m.house?.code} size="sm" />
+                          <div>
+                            <div className="font-bold text-slate-900 text-sm">{m.house?.name}</div>
+                            <div className="text-[11px] text-slate-400 font-medium">{m.house?.code} HOUSE</div>
+                          </div>
+                        </div>
                       </td>
                       <td className="py-4 px-4">
-                        <div className="text-xs text-slate-800 font-medium">{st.department}</div>
-                        <div className="text-[11px] text-slate-400">{st.year}</div>
+                        <div className="font-semibold text-slate-800 text-xs">
+                          {m.activity?.name}
+                        </div>
+                        {m.activity?.activity_date && (
+                          <div className="text-[11px] text-slate-400">
+                            {new Date(m.activity.activity_date).toLocaleDateString()}
+                          </div>
+                        )}
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
-                          {st.activitiesCount}
+                        <span className="inline-flex items-center gap-1 font-black text-sm text-eco-700">
+                          {m.marks}{' '}
+                          <span className="text-xs font-semibold text-slate-400">
+                            / {maxMark}
+                          </span>
+                        </span>
+                        <div className="text-[10px] text-slate-400 font-semibold">{pct}%</div>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <div className="font-bold text-xs text-slate-800">
+                          {m.studentCount} <span className="font-normal text-slate-400">/ {m.totalHouseStudents || m.studentCount} present</span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                          <span>{m.turnoutRate || 100}% turnout</span>
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-right">
-                        <span className="text-base font-extrabold text-eco-700">
-                          {st.totalMarks}
-                        </span>
-                        <span className="text-xs text-slate-400 ml-1">pts</span>
-                      </td>
-                      <td className="py-4 px-4 text-right font-bold text-slate-800">
-                        {st.averageMarks}
+                      <td className="py-4 px-4 text-xs text-slate-500 max-w-xs truncate">
+                        {m.remarks || '—'}
                       </td>
                     </tr>
                   );
