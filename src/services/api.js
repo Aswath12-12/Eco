@@ -42,7 +42,8 @@ export async function getHouseRankings() {
   // 3. Fetch all weekly marks with student_id, activity_id, week_number
   const { data: marks, error: marksErr } = await supabase
     .from('weekly_marks')
-    .select('id, marks, student_id, activity_id, week_number');
+    .select('id, marks, student_id, activity_id, week_number, created_at')
+    .order('created_at', { ascending: true });
   if (marksErr) throw marksErr;
 
   // Map students to house
@@ -64,9 +65,7 @@ export async function getHouseRankings() {
     if (houseId && houseActivityMarks[houseId] !== undefined) {
       const key = `${m.activity_id}_${m.week_number}`;
       const markVal = Number(m.marks) || 0;
-      if (houseActivityMarks[houseId][key] === undefined || markVal > houseActivityMarks[houseId][key]) {
-        houseActivityMarks[houseId][key] = markVal;
-      }
+      houseActivityMarks[houseId][key] = markVal;
     }
   });
 
@@ -437,41 +436,80 @@ export async function getHouseWeeklyMarks({ weekNumber, activityId, houseId } = 
   return Array.from(groups.values());
 }
 
-export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, marks, remarks }) {
+export async function upsertHouseWeeklyMarks({ houseId, activityId, weekNumber, marks, remarks, markIds = [] }) {
   if (!houseId) throw new Error('Please select a House');
   if (!activityId) throw new Error('Please select an Activity');
   if (!weekNumber) throw new Error('Please select a Week Number');
 
-  // Fetch one representative student in this house to anchor the points
+  const cleanMarks = Number(marks);
+  const cleanRemarks = remarks?.trim() || null;
+  const cleanWeek = Number(weekNumber);
+
+  // 1. If markIds were provided, use them directly
+  let targetIds = Array.isArray(markIds) && markIds.length > 0 ? [...markIds] : [];
+
+  // 2. Fetch all students in this house
   const { data: students, error: sErr } = await supabase
     .from('students')
     .select('id')
-    .eq('house_id', houseId)
-    .limit(1);
+    .eq('house_id', houseId);
 
   if (sErr) throw sErr;
   if (!students || students.length === 0) {
     throw new Error('This house does not have any registered students yet. Please assign at least one student to this house first.');
   }
 
-  const studentId = students[0].id;
+  const studentIds = students.map((s) => s.id);
 
-  // Single-row upsert into weekly_marks - ultra fast (~30-50ms)
-  const { data, error } = await supabase
-    .from('weekly_marks')
-    .upsert(
-      {
-        student_id: studentId,
-        activity_id: activityId,
-        week_number: Number(weekNumber),
-        marks: Number(marks),
-        remarks: remarks?.trim() || null,
-      },
-      { onConflict: 'student_id, activity_id, week_number' }
-    );
+  // If no markIds provided, check if any rows already exist for this house, activity, and week
+  if (targetIds.length === 0) {
+    const { data: existingMarks, error: mErr } = await supabase
+      .from('weekly_marks')
+      .select('id')
+      .eq('activity_id', activityId)
+      .eq('week_number', cleanWeek)
+      .in('student_id', studentIds);
 
-  if (error) throw error;
-  return { success: true, data };
+    if (mErr) throw mErr;
+    if (existingMarks && existingMarks.length > 0) {
+      targetIds = existingMarks.map((m) => m.id);
+    }
+  }
+
+  if (targetIds.length > 0) {
+    // Update all matching rows in chunks of 50
+    for (let i = 0; i < targetIds.length; i += 50) {
+      const chunk = targetIds.slice(i, i + 50);
+      const { error: updateErr } = await supabase
+        .from('weekly_marks')
+        .update({
+          marks: cleanMarks,
+          remarks: cleanRemarks,
+        })
+        .in('id', chunk);
+
+      if (updateErr) throw updateErr;
+    }
+  } else {
+    // Brand new house mark entry: anchor to the first student
+    const anchorStudentId = students[0].id;
+    const { data, error } = await supabase
+      .from('weekly_marks')
+      .upsert(
+        {
+          student_id: anchorStudentId,
+          activity_id: activityId,
+          week_number: cleanWeek,
+          marks: cleanMarks,
+          remarks: cleanRemarks,
+        },
+        { onConflict: 'student_id, activity_id, week_number' }
+      );
+
+    if (error) throw error;
+  }
+
+  return { success: true };
 }
 
 export async function deleteHouseWeeklyMarks({ houseId, activityId, weekNumber }) {

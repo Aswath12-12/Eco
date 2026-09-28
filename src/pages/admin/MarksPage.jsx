@@ -153,11 +153,12 @@ export default function MarksPage() {
         weekNumber: Number(formWeek),
         marks: marksNum,
         remarks: formRemarks.trim() || null,
+        markIds: editingMark?.markIds || [],
       });
 
       const targetHouse = houses.find((h) => h.id === formHouseId);
       const houseName = targetHouse?.name?.split(' ')[0] || targetHouse?.code || 'House';
-      success(`Successfully awarded ${marksNum} points to ${houseName} House!`);
+      success(editingMark ? `Successfully updated ${houseName} House marks to ${marksNum} pts!` : `Successfully awarded ${marksNum} points to ${houseName} House!`);
       setIsModalOpen(false);
       loadData();
     } catch (err) {

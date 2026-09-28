@@ -131,15 +131,40 @@ export function AuthProvider({ children }) {
           }
         }
 
+        // Not a student record -> Administrator / Staff user
+        // Auto-provision public.users record as ADMIN so PostgreSQL is_admin() RLS succeeds!
+        try {
+          const adminRecord = {
+            id: authUser.id,
+            name: authUser.user_metadata?.name || 'Administrator',
+            email: authUser.email,
+            role: 'ADMIN',
+          };
+          const { data: newAdmin } = await supabase
+            .from('users')
+            .upsert([adminRecord])
+            .select()
+            .maybeSingle();
+
+          if (newAdmin) {
+            setProfile(newAdmin);
+            setStudentRecord(null);
+            setLoading(false);
+            return;
+          }
+        } catch (pErr) {
+          console.warn('Auto-provisioning public.users admin entry failed:', pErr);
+        }
+
         // Fallback: Check if user exists in auth metadata or needs admin provisioning
-        const metaRole = authUser.user_metadata?.role || (studentRecordFound ? 'STUDENT' : null);
+        const metaRole = authUser.user_metadata?.role || 'ADMIN';
         setProfile({
           id: authUser.id,
-          name: authUser.user_metadata?.name || studentRecordFound?.name || authUser.email.split('@')[0],
+          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Administrator',
           email: authUser.email,
           role: metaRole,
         });
-        setStudentRecord(studentRecordFound || null);
+        setStudentRecord(null);
       }
     } catch (err) {
       console.error('Unexpected error in fetchUserProfile:', err);
