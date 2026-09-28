@@ -162,10 +162,10 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Login error:', err);
       let msg = err.message || 'Failed to sign in. Please verify your credentials.';
-      if (msg.toLowerCase().includes('invalid login credentials')) {
+      if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid credentials')) {
         msg = activeRoleHint === 'STUDENT'
-          ? 'Invalid Roll Number or password. Please verify your Roll Number and default password (stud@sxcce).'
-          : 'Invalid email or password. Please verify your admin credentials (sxcce1234).';
+          ? 'Invalid Roll Number or password. Please verify your credentials and try again.'
+          : 'Invalid email or password. Please verify your admin credentials and try again.';
       }
       setAuthError(msg);
       toastError(msg);
